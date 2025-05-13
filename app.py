@@ -39,8 +39,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Initialisation de SerpApi (à remplacer par votre clé API réelle)
-SERPAPI_KEY = st.secrets.get("SERPAPI_KEY", "demo_key")
+# Initialisation de SerpApi (à configurer dans les secrets de Streamlit)
+SERPAPI_KEY = st.secrets.get("SERPAPI_KEY", None)
+
+# Vérification de la clé API
+if not SERPAPI_KEY:
+    st.error("⚠️ Clé API SerpApi non configurée. Veuillez configurer votre clé API dans les paramètres de l'application.")
+    st.info("""
+    **Configuration de la clé API SerpApi**:
+    1. Créez un compte sur [SerpApi.com](https://serpapi.com/)
+    2. Obtenez votre clé API
+    3. Ajoutez la clé dans les paramètres de l'application Streamlit Cloud
+       - Accédez à votre application sur Streamlit Cloud
+       - Cliquez sur les trois points en haut à droite
+       - Sélectionnez "Settings" > "Secrets"
+       - Ajoutez votre clé: `SERPAPI_KEY = "votre_clé_api"`
+    """)
+    st.stop()  # Arrête l'exécution de l'application
 
 # Initialisation des états de session
 if "quota" not in st.session_state:
@@ -109,18 +124,7 @@ def handle_api_error(function_name, e):
 # Fonctions SerpApi
 @st.cache_data(ttl=3600)
 def serpapi_suggestions(query, lang="fr", country="fr"):
-    """Obtient des suggestions de recherche depuis SerpApi Google Autocomplete"""
-    if SERPAPI_KEY == "demo_key":
-        # Mode démo - données simulées
-        suggestions = [
-            f"{query} app",
-            f"{query} pro",
-            f"{query} gratuit",
-            f"{query} premium",
-            f"meilleur {query}"
-        ]
-        return suggestions[:5]
-    
+    """Obtient des suggestions de recherche depuis SerpApi Google Autocomplete"""    
     url = "https://serpapi.com/search.json"
     params = {
         "engine": "google_autocomplete",
@@ -132,6 +136,7 @@ def serpapi_suggestions(query, lang="fr", country="fr"):
     
     try:
         response = requests.get(url, params=params)
+        response.raise_for_status()  # Lève une exception si la réponse contient une erreur HTTP
         data = response.json()
         
         if "suggestions" in data:
@@ -143,22 +148,7 @@ def serpapi_suggestions(query, lang="fr", country="fr"):
 
 @st.cache_data(ttl=3600)
 def serpapi_search_apps(query, lang="fr", country="fr", limit=5):
-    """Recherche des applications sur le Play Store via SerpApi"""
-    if SERPAPI_KEY == "demo_key":
-        # Mode démo - données simulées
-        results = []
-        for i in range(min(limit, 5)):
-            results.append({
-                "appId": f"com.example.{query.replace(' ', '')}{i}",
-                "title": f"{query.title()} App {i+1}",
-                "developer": f"Développeur {i+1}",
-                "score": round(3.5 + (i % 3) * 0.5, 1),
-                "installs": f"{(i+1)*100000}+",
-                "price": 0 if i % 3 != 0 else 2.99,
-                "free": i % 3 == 0
-            })
-        return results
-    
+    """Recherche des applications sur le Play Store via SerpApi"""    
     url = "https://serpapi.com/search.json"
     params = {
         "engine": "google_play",
@@ -171,6 +161,7 @@ def serpapi_search_apps(query, lang="fr", country="fr", limit=5):
     
     try:
         response = requests.get(url, params=params)
+        response.raise_for_status()
         data = response.json()
         
         results = []
@@ -196,43 +187,47 @@ def serpapi_search_apps(query, lang="fr", country="fr", limit=5):
 @st.cache_data(ttl=3600)
 def serpapi_app_details(app_id, lang="fr", country="fr"):
     """Récupère les détails d'une application via SerpApi"""
-    if SERPAPI_KEY == "demo_key" or not app_id.startswith("com."):
-        # Mode démo ou identifiant d'app invalide
-        app_name = app_id.split(".")[-1].title() if "." in app_id else app_id.title()
+    url = "https://serpapi.com/search.json"
+    params = {
+        "engine": "google_play",
+        "id": app_id,
+        "api_key": SERPAPI_KEY,
+        "gl": country,
+        "hl": lang
+    }
+    
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        data = response.json()
         
-        # Créer des détails d'application simulés
+        if "app_results" not in data:
+            st.error(f"Aucune information trouvée pour l'application {app_id}")
+            return None, [], {}, []
+        
+        app_data = data["app_results"]
+        
+        # Extraire les informations pertinentes
         details = {
-            "title": f"{app_name}",
-            "description": f"Ceci est une description détaillée pour {app_name}. L'application offre diverses fonctionnalités que les utilisateurs peuvent trouver utiles. Elle est conçue pour être conviviale et efficace.\n\nFonctionnalités clés:\n- Fonctionnalité 1\n- Fonctionnalité 2\n- Fonctionnalité 3\n\nCeci est une description fictive à des fins de démonstration.",
-            "genre": "Outils",
-            "icon": f"https://via.placeholder.com/150?text={app_name.replace(' ', '+')}",
-            "developer": f"Développeur de {app_name}",
-            "minInstalls": "1,000,000+",
-            "updated": "2025-05-01"
+            "title": app_data.get("title", ""),
+            "description": app_data.get("description", ""),
+            "genre": app_data.get("genre", ""),
+            "icon": app_data.get("thumbnail", ""),
+            "developer": app_data.get("developer", ""),
+            "minInstalls": app_data.get("installs", "Non disponible"),
+            "updated": app_data.get("updated", "Non disponible")
         }
         
-        # Avis simulés
+        # Récupérer les avis (si disponibles)
         app_reviews = []
-        for i in range(30):
-            score = (i % 5) + 1
-            comment = ""
-            if score == 1:
-                comment = "Cette application est terrible! Elle plante tout le temps et l'interface est confuse. Je ne la recommande pas."
-            elif score == 2:
-                comment = "Pas très bonne. Il y a trop de publicités et l'application est lente. Certaines fonctions ne marchent pas comme prévu."
-            elif score == 3:
-                comment = "Elle est correcte mais pourrait être meilleure. L'interface est un peu confuse et il y a quelques bugs à corriger."
-            elif score == 4:
-                comment = "Bonne application avec des fonctionnalités utiles. Juste quelques problèmes mineurs à améliorer, mais globalement une expérience solide."
-            else:  # score == 5
-                comment = "Excellente application! Facile à utiliser, rapide et dispose de toutes les fonctionnalités dont j'ai besoin. Je la recommande vivement à tous!"
-            
+        reviews_data = app_data.get("reviews", [])
+        for review in reviews_data:
             app_reviews.append({
-                "content": comment,
-                "score": score
+                "content": review.get("content", ""),
+                "score": review.get("rating", 0)
             })
         
-        # Statistiques des avis
+        # Calculer les statistiques des avis
         avis_stats = {
             "nb_avis_1": sum(1 for r in app_reviews if r["score"] == 1),
             "nb_avis_2": sum(1 for r in app_reviews if r["score"] == 2),
@@ -241,15 +236,14 @@ def serpapi_app_details(app_id, lang="fr", country="fr"):
             "nb_avis_5": sum(1 for r in app_reviews if r["score"] == 5),
         }
         
-        # Avis négatifs
+        # Extraire les avis négatifs
         avis_negatifs = [r for r in app_reviews if r["score"] <= 3]
         
         return details, app_reviews, avis_stats, avis_negatifs
-    
-    # En mode prod, on appelerait l'API SerpApi pour obtenir les détails
-    # Mais cette partie nécessiterait un abonnement payant à SerpApi
-    # Pour l'instant, on utilise des données simulées
-    return serpapi_app_details(app_id)
+        
+    except Exception as e:
+        handle_api_error("serpapi_app_details", e)
+        return None, [], {}, []
 
 # Fonctions d'analyse
 @st.cache_data(ttl=3600)
