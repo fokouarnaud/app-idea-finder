@@ -164,12 +164,19 @@ def serpapi_search_apps(query, lang="fr", country="fr", limit=5):
         response.raise_for_status()
         data = response.json()
         
+        # Pour débogage
+        st.write("Clés disponibles dans la réponse:", list(data.keys()))
+        
         results = []
+        
+        # Vérifier les deux structures possibles selon la documentation
         if "organic_results" in data and data["organic_results"]:
+            st.success("Résultats trouvés dans 'organic_results'")
+            
             for app_data in data["organic_results"][:limit]:
-                # Transformer les données SerpApi en format compatible
+                # Format original
                 app_info = {
-                    "appId": app_data.get("id", ""),
+                    "appId": app_data.get("id", app_data.get("app_id", "")),
                     "title": app_data.get("title", ""),
                     "developer": app_data.get("developer", ""),
                     "score": app_data.get("rating", 0),
@@ -178,9 +185,31 @@ def serpapi_search_apps(query, lang="fr", country="fr", limit=5):
                     "free": "Gratuit" in app_data.get("price_text", "Gratuit")
                 }
                 results.append(app_info)
+                
+        elif "apps_results" in data and data["apps_results"]:
+            st.success("Résultats trouvés dans 'apps_results'")
+            
+            for app_data in data["apps_results"][:limit]:
+                app_info = {
+                    "appId": app_data.get("id", app_data.get("app_id", "")),
+                    "title": app_data.get("title", ""),
+                    "developer": app_data.get("developer", ""),
+                    "score": app_data.get("rating", app_data.get("score", 0)),
+                    "installs": app_data.get("downloads", app_data.get("installs", "Non disponible")),
+                    "price": app_data.get("price_text", "Gratuit").replace("Gratuit", "0"),
+                    "free": "Gratuit" in app_data.get("price_text", "Gratuit")
+                }
+                results.append(app_info)
+        
+        # Si aucun résultat dans ces structures, afficher toute la réponse pour débogage
+        if not results:
+            st.warning("Aucun résultat trouvé dans les structures attendues")
+            st.json(data)
         
         return results
+    
     except Exception as e:
+        st.error(f"Erreur détaillée: {str(e)}")
         handle_api_error("serpapi_search_apps", e)
         return []
 
@@ -201,20 +230,29 @@ def serpapi_app_details(app_id, lang="fr", country="fr"):
         response.raise_for_status()
         data = response.json()
         
-        if "app_results" not in data:
-            st.error(f"Aucune information trouvée pour l'application {app_id}")
-            return None, [], {}, []
+        # Pour débogage
+        st.write("Clés disponibles dans la réponse des détails:", list(data.keys()))
         
-        app_data = data["app_results"]
+        # Vérifier les différentes structures possibles
+        app_data = None
+        if "app_results" in data:
+            app_data = data["app_results"]
+        elif "applications" in data and data["applications"]:
+            app_data = data["applications"][0]  # Prendre la première application
+        
+        if not app_data:
+            st.error(f"Aucune information trouvée pour l'application {app_id}")
+            st.json(data)  # Afficher les données brutes pour débogage
+            return None, [], {}, []
         
         # Extraire les informations pertinentes
         details = {
             "title": app_data.get("title", ""),
             "description": app_data.get("description", ""),
-            "genre": app_data.get("genre", ""),
-            "icon": app_data.get("thumbnail", ""),
+            "genre": app_data.get("genre", app_data.get("category", "")),
+            "icon": app_data.get("thumbnail", app_data.get("icon", "")),
             "developer": app_data.get("developer", ""),
-            "minInstalls": app_data.get("installs", "Non disponible"),
+            "minInstalls": app_data.get("installs", app_data.get("downloads", "Non disponible")),
             "updated": app_data.get("updated", "Non disponible")
         }
         
@@ -224,7 +262,7 @@ def serpapi_app_details(app_id, lang="fr", country="fr"):
         for review in reviews_data:
             app_reviews.append({
                 "content": review.get("content", ""),
-                "score": review.get("rating", 0)
+                "score": review.get("rating", review.get("score", 0))
             })
         
         # Calculer les statistiques des avis
@@ -242,6 +280,7 @@ def serpapi_app_details(app_id, lang="fr", country="fr"):
         return details, app_reviews, avis_stats, avis_negatifs
         
     except Exception as e:
+        st.error(f"Erreur détaillée: {str(e)}")
         handle_api_error("serpapi_app_details", e)
         return None, [], {}, []
 
@@ -442,6 +481,48 @@ with st.sidebar:
         - ✅ Mise en cache des résultats (1h)
         - ✅ Limitation du volume de données
         """)
+
+# Section de test API pour diagnostic temporaire
+with st.expander("🔧 Test direct de l'API SerpApi"):
+    if st.button("Tester la connexion à l'API"):
+        test_url = "https://serpapi.com/search.json"
+        test_params = {
+            "engine": "google_play",
+            "q": "fitness tracker",  # Mot-clé simple pour test
+            "api_key": SERPAPI_KEY,
+            "gl": "fr",
+            "hl": "fr",
+            "store": "apps"
+        }
+        
+        try:
+            test_response = requests.get(test_url, test_params)
+            test_response.raise_for_status()
+            test_data = test_response.json()
+            
+            st.success("Connexion à l'API SerpApi réussie!")
+            st.write("Structure de la réponse:")
+            st.write(list(test_data.keys()))
+            
+            # Chercher où sont les résultats d'applications
+            if "organic_results" in test_data:
+                st.success(f"'organic_results' trouvé avec {len(test_data['organic_results'])} résultats")
+            if "apps_results" in test_data:
+                st.success(f"'apps_results' trouvé avec {len(test_data['apps_results'])} résultats")
+            if "paid_results" in test_data:
+                st.success(f"'paid_results' trouvé avec {len(test_data['paid_results'])} résultats")
+            if "free_results" in test_data:
+                st.success(f"'free_results' trouvé avec {len(test_data['free_results'])} résultats")
+            
+            # Afficher un échantillon pour voir la structure
+            sample_key = next((k for k in ["organic_results", "apps_results", "paid_results", "free_results"] 
+                             if k in test_data and test_data[k]), None)
+            if sample_key and test_data[sample_key]:
+                st.write(f"Exemple de structure dans '{sample_key}':")
+                st.json(test_data[sample_key][0])
+            
+        except Exception as e:
+            st.error(f"Erreur lors du test de l'API: {str(e)}")
 
 # Interface principale
 tab1, tab2, tab3 = st.tabs(["Recherche", "Analyse de la concurrence", "Potentiel du marché"])
