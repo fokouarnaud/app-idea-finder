@@ -420,7 +420,7 @@ with st.sidebar:
         st.session_state.quota["reset_time"] = datetime.now().strftime("%H:%M:%S")
         st.session_state.quota["backoff_factor"] = 1.0
         st.session_state.quota["last_error_time"] = None
-        st.experimental_rerun()
+        st.rerun()
     
     analyse_mode = st.radio(
         "Mode d'analyse",
