@@ -4,8 +4,21 @@ import plotly.express as px
 import time
 import random
 from datetime import datetime
-from google_play_scraper import search, app, reviews, suggestions
-from google_play_scraper.exceptions import NotFoundError
+
+# Gestion des importations avec try/except pour être plus robuste sur Streamlit Cloud
+try:
+    from google_play_scraper import search, app, reviews, suggestions
+    from google_play_scraper.exceptions import NotFoundError
+    SCRAPER_AVAILABLE = True
+except ImportError:
+    st.error("⚠️ Impossible d'importer google-play-scraper. Certaines fonctionnalités seront limitées.")
+    # Créer des fonctions factices pour éviter les erreurs
+    def search(*args, **kwargs): return []
+    def app(*args, **kwargs): return {}
+    def reviews(*args, **kwargs): return [], None
+    def suggestions(*args, **kwargs): return []
+    class NotFoundError(Exception): pass
+    SCRAPER_AVAILABLE = False
 
 # Configuration de la page
 st.set_page_config(
@@ -107,6 +120,15 @@ def handle_api_error(function_name, e):
 @st.cache_data(ttl=3600)
 def obtenir_suggestions_keywords(prefixes, max_suggestions=5):
     """Obtient les suggestions de recherche pour une liste de préfixes avec protection contre le blocage"""
+    if not SCRAPER_AVAILABLE:
+        st.warning("Cette fonctionnalité nécessite google-play-scraper qui n'est pas disponible.")
+        # Données de démonstration
+        demo_data = []
+        for prefix in prefixes:
+            for i in range(3):
+                demo_data.append({"prefix": prefix, "suggestion": f"{prefix} app {i+1}"})
+        return pd.DataFrame(demo_data)
+    
     resultats = {}
     
     for prefix in prefixes:
@@ -140,6 +162,15 @@ def obtenir_suggestions_keywords(prefixes, max_suggestions=5):
 @st.cache_data(ttl=3600)
 def analyser_concurrence(keyword, limit=5, max_retries=3):
     """Analyse la concurrence pour un mot-clé donné avec tentatives de réessai"""
+    if not SCRAPER_AVAILABLE:
+        st.warning("Cette fonctionnalité nécessite google-play-scraper qui n'est pas disponible.")
+        # Données de démonstration
+        return pd.DataFrame([
+            {"app_id": "com.example.app1", "title": "App 1", "developer": "Dev 1", "score": 4.5, "installs": "1M+", "price": 0, "free": True},
+            {"app_id": "com.example.app2", "title": "App 2", "developer": "Dev 2", "score": 3.8, "installs": "500K+", "price": 0, "free": True},
+            {"app_id": "com.example.app3", "title": "App 3", "developer": "Dev 3", "score": 4.2, "installs": "100K+", "price": 0, "free": True},
+        ])
+    
     if not update_quota(cost=2):  # Coût plus élevé pour l'analyse concurrentielle
         return pd.DataFrame(columns=["app_id", "title", "score", "installs", "price"])
     
@@ -183,6 +214,35 @@ def analyser_concurrence(keyword, limit=5, max_retries=3):
 @st.cache_data(ttl=3600)
 def analyser_details_app(app_id, max_retries=3):
     """Récupère les détails d'une application avec tentatives de réessai"""
+    if not SCRAPER_AVAILABLE:
+        st.warning("Cette fonctionnalité nécessite google-play-scraper qui n'est pas disponible.")
+        # Données de démonstration
+        demo_details = {
+            "title": "Demo App",
+            "description": "This is a demo app for testing purposes.",
+            "genre": "Tools",
+            "icon": "https://via.placeholder.com/150",
+            "developer": "Demo Developer",
+            "minInstalls": "1,000,000+",
+            "updated": "2023-12-01"
+        }
+        demo_reviews = [
+            {"content": "Great app but needs more features.", "score": 4},
+            {"content": "I love this app!", "score": 5},
+            {"content": "Crashes frequently on my device.", "score": 2},
+            {"content": "Not worth the download.", "score": 1},
+            {"content": "It's okay but could be better.", "score": 3}
+        ]
+        avis_stats = {
+            "nb_avis_1": 1,
+            "nb_avis_2": 1,
+            "nb_avis_3": 1,
+            "nb_avis_4": 1,
+            "nb_avis_5": 1,
+        }
+        avis_negatifs = [r for r in demo_reviews if r["score"] <= 3]
+        return demo_details, demo_reviews, avis_stats, avis_negatifs
+    
     if not update_quota(cost=3):  # Coût élevé pour l'analyse détaillée
         return None, [], {}, []
     
@@ -278,6 +338,10 @@ st.markdown("""
 Découvrez des idées d'applications rentables en analysant les recherches réelles 
 des utilisateurs et la concurrence sur le Google Play Store.
 """)
+
+# Message d'état du scraper
+if not SCRAPER_AVAILABLE:
+    st.warning("⚠️ Le scraper Google Play n'est pas disponible. L'application fonctionne en mode démo avec des données fictives.")
 
 # Afficher l'état du quota dans la sidebar
 with st.sidebar:
