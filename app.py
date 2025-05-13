@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.express as px
 import time
 import random
+import requests
+import json
 from datetime import datetime
 
 # Configuration de la page - DOIT ÊTRE LE PREMIER APPEL À STREAMLIT
@@ -15,22 +17,14 @@ st.set_page_config(
 
 # Gestion des importations avec try/except pour être plus robuste
 try:
+    # Essai d'importation du scraper officiel (peu probable sur Streamlit Cloud)
     from google_play_scraper import search, app, reviews, suggestions
     from google_play_scraper.exceptions import NotFoundError
-    SCRAPER_MODE = "officiel"
+    SCRAPER_TYPE = "officiel"
 except ImportError:
-    # Essayer d'utiliser notre scraper personnalisé
-    try:
-        from scrapers.play_scraper import search, app, reviews, suggestions, NotFoundError
-        SCRAPER_MODE = "personnalisé"
-    except ImportError:
-        # Créer des fonctions factices pour éviter les erreurs
-        def search(*args, **kwargs): return []
-        def app(*args, **kwargs): return {}
-        def reviews(*args, **kwargs): return [], None
-        def suggestions(*args, **kwargs): return []
-        class NotFoundError(Exception): pass
-        SCRAPER_MODE = "démo"
+    # Utilisation de notre scraper personnalisé intégré au projet
+    from scrapers.play_scraper import search, app, reviews, suggestions, NotFoundError
+    SCRAPER_TYPE = "personnalisé"
 
 # Style CSS personnalisé
 st.markdown("""
@@ -123,7 +117,7 @@ def handle_api_error(function_name, e):
 # Fonctions d'analyse avec protection contre le blocage
 @st.cache_data(ttl=3600)
 def obtenir_suggestions_keywords(prefixes, max_suggestions=5):
-    """Obtient les suggestions de recherche pour une liste de préfixes avec protection contre le blocage"""
+    """Obtient les suggestions de recherche pour une liste de préfixes"""
     resultats = {}
     
     for prefix in prefixes:
@@ -135,7 +129,7 @@ def obtenir_suggestions_keywords(prefixes, max_suggestions=5):
                 # Pause aléatoire avant chaque requête
                 time.sleep(random.uniform(1.5, 3.0))
                 
-                # Utiliser la fonction suggestions de google-play-scraper
+                # Utiliser la fonction suggestions du scraper
                 sugg = suggestions(
                     prefix,
                     lang="fr",
@@ -295,12 +289,6 @@ st.markdown("""
 Découvrez des idées d'applications rentables en analysant les recherches réelles 
 des utilisateurs et la concurrence sur le Google Play Store.
 """)
-
-# Message d'information sur le mode de fonctionnement
-if SCRAPER_MODE == "personnalisé":
-    st.sidebar.info("🔄 Application fonctionnant avec des données simulées", icon="ℹ️")
-elif SCRAPER_MODE == "démo":
-    st.sidebar.warning("📥 Mode démo avec données limitées", icon="⚠️")
 
 # Afficher l'état du quota dans la sidebar
 with st.sidebar:
