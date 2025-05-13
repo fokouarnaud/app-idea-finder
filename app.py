@@ -5,12 +5,21 @@ import time
 import random
 from datetime import datetime
 
+# Configuration de la page - DOIT ÊTRE LE PREMIER APPEL À STREAMLIT
+st.set_page_config(
+    page_title="App Idea Finder",
+    page_icon="🔍",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # Gestion des importations avec try/except pour être plus robuste sur Streamlit Cloud
 try:
     from google_play_scraper import search, app, reviews, suggestions
     from google_play_scraper.exceptions import NotFoundError
     SCRAPER_AVAILABLE = True
 except ImportError:
+    # IMPORTANT: Ce message d'erreur doit venir APRÈS st.set_page_config()
     st.error("⚠️ Impossible d'importer google-play-scraper. Certaines fonctionnalités seront limitées.")
     # Créer des fonctions factices pour éviter les erreurs
     def search(*args, **kwargs): return []
@@ -19,14 +28,6 @@ except ImportError:
     def suggestions(*args, **kwargs): return []
     class NotFoundError(Exception): pass
     SCRAPER_AVAILABLE = False
-
-# Configuration de la page
-st.set_page_config(
-    page_title="App Idea Finder",
-    page_icon="🔍",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # Style CSS personnalisé
 st.markdown("""
