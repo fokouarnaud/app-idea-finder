@@ -18,16 +18,24 @@ try:
     from google_play_scraper import search, app, reviews, suggestions
     from google_play_scraper.exceptions import NotFoundError
     SCRAPER_AVAILABLE = True
+    st.success("Google-Play-Scraper importé avec succès!")
 except ImportError:
-    # IMPORTANT: Ce message d'erreur doit venir APRÈS st.set_page_config()
-    st.error("⚠️ Impossible d'importer google-play-scraper. Certaines fonctionnalités seront limitées.")
-    # Créer des fonctions factices pour éviter les erreurs
-    def search(*args, **kwargs): return []
-    def app(*args, **kwargs): return {}
-    def reviews(*args, **kwargs): return [], None
-    def suggestions(*args, **kwargs): return []
-    class NotFoundError(Exception): pass
-    SCRAPER_AVAILABLE = False
+    # Essayer d'utiliser notre scraper personnalisé
+    try:
+        st.warning("Tentative d'utilisation du scraper personnalisé...")
+        from scrapers.play_scraper import search, app, reviews, suggestions, NotFoundError
+        SCRAPER_AVAILABLE = True
+        st.success("Scraper personnalisé importé avec succès! Les données seront simulées.")
+    except ImportError:
+        # IMPORTANT: Ce message d'erreur doit venir APRÈS st.set_page_config()
+        st.error("⚠️ Impossible d'importer les scrapers. Fonctionnement en mode démo.")
+        # Créer des fonctions factices pour éviter les erreurs
+        def search(*args, **kwargs): return []
+        def app(*args, **kwargs): return {}
+        def reviews(*args, **kwargs): return [], None
+        def suggestions(*args, **kwargs): return []
+        class NotFoundError(Exception): pass
+        SCRAPER_AVAILABLE = False
 
 # Style CSS personnalisé
 st.markdown("""

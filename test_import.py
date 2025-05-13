@@ -7,16 +7,16 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("Test d'importation de Google-Play-Scraper")
+st.title("Test d'importation de Scraper")
 
-# Test d'importation
+# Test d'importation du scraper officiel
+st.subheader("1. Test de google-play-scraper")
 try:
     from google_play_scraper import search, app, reviews, suggestions
     st.success("✅ L'importation de google-play-scraper a réussi!")
     st.write("Version installée:", getattr(search, "__version__", "Inconnue"))
     
     # Afficher les fonctions disponibles
-    st.subheader("Fonctions disponibles:")
     st.code("""
     from google_play_scraper import search, app, reviews, suggestions
     
@@ -34,22 +34,29 @@ try:
     """)
     
 except ImportError as e:
-    st.error(f"❌ Erreur d'importation: {str(e)}")
-    st.info("Essayons d'installer le package manuellement...")
+    st.error(f"❌ Erreur d'importation du scraper officiel: {str(e)}")
+
+# Test d'importation du scraper personnalisé
+st.subheader("2. Test de notre scraper personnalisé")
+try:
+    from scrapers.play_scraper import search as custom_search, __version__ as custom_version
+    st.success("✅ L'importation du scraper personnalisé a réussi!")
+    st.write("Version du scraper personnalisé:", custom_version)
     
-    # Afficher la commande d'installation
-    st.code("pip install google-play-scraper==1.2.4")
-    
-    # Tenter l'installation (ne fonctionnera pas dans Streamlit Cloud)
-    import sys
-    import subprocess
-    try:
-        st.write("Tentative d'installation...")
-        result = subprocess.check_output([sys.executable, "-m", "pip", "install", "google-play-scraper==1.2.4"])
-        st.success("Installation réussie! Redémarrez l'application.")
-    except Exception as install_error:
-        st.error(f"Erreur lors de l'installation: {str(install_error)}")
-        st.warning("Cette opération n'est probablement pas autorisée dans Streamlit Cloud.")
+    # Tester une fonction du scraper personnalisé
+    st.subheader("Test de fonctionnalité")
+    with st.spinner("Recherche de suggestions pour 'app'..."):
+        suggestions = custom_search("app", n_hits=3)
+        st.write("Résultats de recherche pour 'app':", suggestions)
+        
+    if suggestions:
+        st.success("Le scraper personnalisé fonctionne correctement!")
+    else:
+        st.warning("Le scraper personnalisé n'a retourné aucun résultat.")
+        
+except ImportError as e:
+    st.error(f"❌ Erreur d'importation du scraper personnalisé: {str(e)}")
+    st.info("Assurez-vous que le dossier 'scrapers' est présent dans le même répertoire que ce script.")
 
 # Informations système
 st.subheader("Informations système")
@@ -60,7 +67,25 @@ st.write(f"Executable path: {sys.executable}")
 # Lister tous les packages installés
 st.subheader("Packages installés")
 try:
+    import subprocess
     installed_packages = subprocess.check_output([sys.executable, "-m", "pip", "freeze"]).decode("utf-8")
     st.code(installed_packages)
 except Exception as e:
     st.error(f"Impossible de lister les packages: {str(e)}")
+
+# Récapitulatif
+st.subheader("Récapitulatif")
+st.markdown("""
+### Diagnostic:
+
+Si vous voyez l'un des scrapers importé avec succès, votre application devrait fonctionner correctement.
+
+#### Préférence d'utilisation:
+1. Scraper officiel (google-play-scraper) - Données réelles
+2. Scraper personnalisé (scrapers.play_scraper) - Données simulées
+3. Mode démo - Si aucun scraper n'est disponible
+
+### Que faire maintenant?
+- Si les tests réussissent, déployez la version principale de l'application
+- Si l'import échoue, vérifiez les instructions dans DEPLOYMENT.md
+""")
